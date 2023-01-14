@@ -80,11 +80,9 @@ class SpeechTransformer:
         return tf.math.reduce_sum(loss) / tf.math.reduce_sum(mask)
     
     def train_step(self, inp, targ):
-        
-        encoder_padding_mask, decoder_look_ahead_mask, decoder_padding_mask = generate_mask(inp, targ)
-
+    
         with tf.GradientTape() as tape:
-            preds = self.model(inp, targ, True, encoder_padding_mask, decoder_look_ahead_mask, decoder_padding_mask)
+            preds = self.model(inp, targ, True)
 
             d_loss = self.loss_function(targ, preds)
 

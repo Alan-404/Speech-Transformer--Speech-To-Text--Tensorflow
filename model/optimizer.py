@@ -1,6 +1,7 @@
 import tensorflow as tf
+from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 
-class CustomLearningRate(tf.keras.optimizers.schedules.LearningRateSchedule):
+class CustomLearningRate(LearningRateSchedule):
     def __init__(self, d_model, warmup_steps = 4000):
         super(CustomLearningRate, self).__init__()
         self.d_model = d_model

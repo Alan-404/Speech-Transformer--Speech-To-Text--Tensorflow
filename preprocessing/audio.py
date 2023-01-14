@@ -80,12 +80,6 @@ class AudioProcessor:
         if sample_rate is None:
             self.sample_rate = 22050
         self.duration = duration
-        """ self.mono = mono
-        self.frame_size = frame_size
-        self.hop_length = hop_length
-        self.mode = mode
-        self.min = min
-        self.max = max """
         self.loader = Loader(sample_rate, duration, mono)
         self.padder = Padder(mode)
         self.extractor = Extractor(frame_size, hop_length)
