@@ -11,7 +11,8 @@ class TextProcessor:
 
     def preprocess_sequence(self, sequence: str):
         sequence = sequence.strip()
-        sequence = re.sub(r'[!?,.-@]', "", sequence)
+        sequence = re.sub(r"([?.!,¿])", "", sequence)
+        sequence = re.sub(r'\s\s+', ' ', sequence)
         return sequence
 
     def __load_tokenizer(self):
@@ -19,7 +20,7 @@ class TextProcessor:
             with open(self.tokenizer_path + "/tokenizer.pickle", 'rb') as handle:
                 self.tokenizer = pickle.load(handle)
         else:
-            self.tokenizer = Tokenizer()
+            self.tokenizer = Tokenizer(filters=None)
     
     def __save_tokenizer(self):
         if os.path.exists(self.tokenizer_path) == False:
@@ -28,8 +29,9 @@ class TextProcessor:
             pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def __build_tokenizer(self, sequences: list):
-        for sequence in sequences:
-            sequence = self.preprocess_sequence(sequence)
+        for i in range(len(sequences)):
+            sequences[i] = self.preprocess_sequence(sequence=sequences[i])
+            sequences[i] = "{} {} {}".format("__CLS__", sequences[i], "__SEP__")
         self.tokenizer.fit_on_texts(sequences)
 
     def process(self, sequences: list, max_length: int, padding: str = "post", truncating: str = "post"):

@@ -8,8 +8,12 @@ from typing import Union, Callable
 from model.optimizer import CustomLearningRate
 from keras.losses import SparseCategoricalCrossentropy
 import os
+from keras.optimizers import Adam
+from keras.metrics import Mean
+import pickle
 
-class __SpeechTransformer(Model):
+
+class SpeechTransformerModel(Model):
     def __init__(self, 
                 vocab_size: int,
                 max_length: int,
@@ -51,12 +55,39 @@ class SpeechTransformer:
                 m: int = 2, n: int = 64, c: int = 64, 
                 kernel_size: int | tuple = 3, 
                 strides: int | tuple = 3, 
-                padding: str = "same"):
-        self.model = __SpeechTransformer(vocab_size, max_length, n_layer, embedding_dim, heads, d_ff, dropout_rate, eps, activation, m, n, c, kernel_size, strides, padding)
+                padding: str = "same",
+                checkpoint_folder: str = "./checkpoint",
+                history_folder: str = "./history"):
+        self.model = SpeechTransformerModel(vocab_size, max_length, n_layer, embedding_dim, heads, d_ff, dropout_rate, eps, activation, m, n, c, kernel_size, strides, padding)
         self.lrate = CustomLearningRate(d_model=embedding_dim)
+        self.optimizer = Adam(learning_rate=self.lrate)
+        self.checkpoint =  tf.train.Checkpoint(model = self.model, optimizer = self.optimizer)
+        self.checkpoint_folder = checkpoint_folder
+        self.checkpoint_manager = tf.train.CheckpointManager(checkpoint=self.checkpoint, directory=self.checkpoint_folder,max_to_keep=3)
 
+        self.train_loss = Mean(name="train loss")
+        self.train_accuracy = Mean(name = "train accuracy")
 
-    def cal_acc(self, real, pred):
+        self.history_folder = history_folder
+        self.loss_history = []
+        self.accuracy_history = []
+        
+        self.__create_folder()
+
+    def __create_folder(self):
+        if os.path.exists(self.history_folder) == False:
+            os.mkdir(self.history_folder)
+
+        if os.path.exists(self.checkpoint_folder) == False:
+            os.mkdir(self.checkpoint_folder)
+
+    def save_history(self):
+        with open('./' + self.history_folder + "/train.pickle", 'wb') as handle:
+            pickle.dump(self.accuracy_history, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open('./' + self.history_folder + "/loss.pickle", 'wb') as handle:
+            pickle.dump(self.loss_history, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def cal_acc(self, real: tf.Tensor, pred: tf.Tensor):
         accuracies = tf.equal(real, tf.argmax(pred, axis=2))
 
         mask = tf.math.logical_not(real == 0)
@@ -66,7 +97,7 @@ class SpeechTransformer:
 
         return tf.math.reduce_sum(accuracies) / tf.math.reduce_sum(mask)
 
-    def loss_function(self, real, pred):        
+    def loss_function(self, real: tf.Tensor, pred: tf.Tensor):        
         cross_entropy = SparseCategoricalCrossentropy(from_logits=True, reduction='none')
         
         mask = tf.math.logical_not(real == 0)
@@ -79,7 +110,7 @@ class SpeechTransformer:
         
         return tf.math.reduce_sum(loss) / tf.math.reduce_sum(mask)
     
-    def train_step(self, inp, targ):
+    def train_step(self, inp: tf.Tensor, targ: tf.Tensor):
     
         with tf.GradientTape() as tape:
             preds = self.model(inp, targ, True)
@@ -91,9 +122,11 @@ class SpeechTransformer:
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
         self.train_loss.update_state(d_loss)
-        self.train_accuracy.update_state(self.cal_acc(targ, preds))
+
+        acc = self.cal_acc(targ, preds)
+        self.train_accuracy.update_state(acc)
     
-    def fit(self, data, epochs = 1, saved_checkpoint_at = 1):
+    def fit(self, data: tf.data.Dataset, epochs: int = 1, saved_checkpoint_at: int = 1):
         if not os.path.exists(self.checkpoint_folder):
             os.makedirs(self.checkpoint_folder)
         if self.checkpoint_manager.latest_checkpoint:
@@ -105,7 +138,11 @@ class SpeechTransformer:
 
             for (batch, (inp, targ)) in enumerate(data):
                 self.train_step(inp, targ)
+                self.accuracy_history.append({'epoch ' + str(epoch): self.train_accuracy})
+                self.loss_history.append({'epoch ' + str(epoch): self.train_loss})
 
+                self.save_history()
+                
                 if batch % 50 == 0:
                     print(f'Epoch {epoch + 1} Batch {batch} Loss {self.train_loss.result():.3f} Accuracy {self.train_accuracy.result():.3f}')
                 if (epoch + 1) % saved_checkpoint_at == 0:

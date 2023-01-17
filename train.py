@@ -29,5 +29,22 @@ for file in x:
     signal = audio_processor.process("./wave-data/dataset/" + file)
     x_train.append(signal)
 # %%
+import pickle
+# %%
+x_train = np.array(x_train)
+
+# %%
+x = np.expand_dims(x_train, axis=-1)
+# %%
+x.shape
+# %%
+with open('./clean/audio.pickle', 'wb') as handle:
+    pickle.dump(x, handle, protocol=pickle.HIGHEST_PROTOCOL)
+# %%
+y_train.shape
+# %%
+with open('./clean/text.pickle', 'wb') as handle:
+    pickle.dump(y_train, handle, protocol=pickle.HIGHEST_PROTOCOL)
+# %%
 
 # %%
